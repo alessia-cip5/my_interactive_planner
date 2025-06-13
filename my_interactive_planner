@@ -1,0 +1,467 @@
+import tkinter as tk
+from PIL import Image, ImageTk
+
+class DailyPlannerApp:
+    MAX_TASKS = 5
+
+    # initialize the program
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Daily Planner")
+        self.root.geometry("800x600")
+        self.edit_widgets = []
+
+        # choosing fonts
+        self.handwriting_font = ("Patrick Hand", 16)
+        self.title_font = ("Segoe Script", 28, "bold")
+
+        # basics user input
+        self.user_name = ""
+        self.tasks = []
+        self.no_tasks_warning_id = None  # tracking warning text
+        self.intention_text = ""
+
+        # canvas for backgrounds and writing 
+        self.canvas = tk.Canvas(self.root, width=800, height=600, highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+
+        self.show_start_screen()
+
+    # loading background image 
+    def load_background(self, image_path):
+        try:
+            image = Image.open(image_path)
+            image = image.resize((800, 600), Image.Resampling.LANCZOS)
+            self.bg_image = ImageTk.PhotoImage(image)
+            self.canvas.create_image(0, 0, anchor="nw", image=self.bg_image)
+        except FileNotFoundError:
+            self.canvas.config(bg="#fffacd")  # fallback yellow background if image not found
+
+    # clearing the screen before making a new one
+    def clear_screen(self):
+        self.canvas.delete("all")
+        for widget in self.root.winfo_children():
+            if isinstance(widget, (tk.Entry, tk.Text, tk.Button, tk.Label, tk.Checkbutton)):
+                widget.destroy()
+
+    # typewriter effect for text 
+    def typewriter_effect(self, text_item, full_text, delay=50, callback=None):
+        def write_char(index=0):
+            if index <= len(full_text):
+                self.canvas.itemconfig(text_item, text=full_text[:index])
+                self.root.after(delay, write_char, index + 1)
+            elif callback:
+                callback()
+        write_char()
+
+    # showing the start screen with a background and the title
+    def show_start_screen(self):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+
+        title = self.canvas.create_text(400, 300, text="My Daily Planner",
+                                        font=self.title_font, fill="black")
+        self.root.after(2500, self.fade_out_start_screen)
+
+    # making the transition smoother by fading out
+    def fade_out_start_screen(self, step=0.05):
+        current_alpha = self.root.attributes('-alpha')
+        if current_alpha > 0:
+            self.root.attributes('-alpha', current_alpha - step)
+            self.root.after(50, self.fade_out_start_screen, step)
+        else:
+            self.root.attributes('-alpha', 1.0)
+            self.show_welcome_screen()
+
+    # setting up welcome screen and asking the user their name
+    def show_welcome_screen(self):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+
+        self.canvas.create_text(400, 60, text="My Daily Planner", font=self.title_font, fill="white")
+
+        prompt = self.canvas.create_text(400, 240, text="", font=self.handwriting_font, fill="black")
+        self.typewriter_effect(prompt, "Hey there! What's your name?", callback=self.show_name_entry)
+
+    # setting up an entry where the user can write their name
+    def show_name_entry(self):
+        entry = tk.Entry(self.root, font=self.handwriting_font, bd=0, bg="white", justify='center')
+        self.canvas.create_window(400, 290, window=entry, width=300)
+
+        submit_btn = tk.Button(self.root, text="Submit", font=self.handwriting_font,
+                               command=lambda: self.save_name(entry.get()))
+        self.canvas.create_window(400, 350, window=submit_btn)
+
+        entry.bind("<Return>", lambda e: self.save_name(entry.get()))
+
+    # saving the name of the user and proceeding to the next screen
+    def save_name(self, name):
+        self.user_name = name.strip().capitalize()
+        if self.user_name:
+            self.show_greeting_screen()
+
+    # greeting the user
+    def show_greeting_screen(self):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+
+        greeting = f"Hello {self.user_name}! Ready to make today awesome? 💪"
+        greeting_text = self.canvas.create_text(400, 260, text="", font=self.handwriting_font, fill="black", width=600)
+        
+        # adding interaction through a yes button to proceed
+        def after_greeting():
+            yes_btn = tk.Button(
+                self.root,
+                text="Yes!",
+                font=self.handwriting_font,
+                command=self.show_intention_screen
+            )
+            self.canvas.create_window(400, 320, window=yes_btn)
+
+        self.typewriter_effect(
+            greeting_text,
+            greeting,
+            callback=lambda: self.root.after(500, after_greeting)
+        )
+
+    # asking user for their intention for the day and creating intention screen
+    def show_intention_screen(self):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+
+        intro = self.canvas.create_text(400, 100, text="", font=self.handwriting_font, fill="black", width=600)
+        self.typewriter_effect(intro, "First things first: what's your intention for today? ✨",
+                               callback=self.show_intention_entry)
+
+    # setting up the user intention entry 
+    def show_intention_entry(self):
+        label = tk.Label(self.root, text="My intention for today is:", font=self.handwriting_font,
+                         bg="white", fg="black")
+        self.canvas.create_window(400, 160, window=label)
+
+        self.intention_input = tk.Text(self.root, height=3, width=50,
+                                       font=self.handwriting_font, bg="white", bd=0, highlightthickness=0)
+        self.canvas.create_window(400, 240, window=self.intention_input)
+
+        next_btn = tk.Button(self.root, text="Next", font=self.handwriting_font,
+                             command=self.intention_feedback)
+        self.canvas.create_window(700, 550, window=next_btn)
+
+        self.intention_input.bind("<Return>", lambda e: (self.intention_feedback(), "break"))
+
+    # saving user intention and giving feedback before proceeding 
+    def intention_feedback(self):
+        intention = self.intention_input.get("1.0", "end").strip()
+        if intention:
+            self.intention_text = intention  # save intention here
+            self.clear_screen()
+            self.load_background("background_flowers.jpg")
+            text_id = self.canvas.create_text(400, 260, text="", font=self.handwriting_font, fill="black", width=600)
+            self.typewriter_effect(text_id, "Fantastic! Let's get started! 🚀", callback=self.show_task_screen)
+
+    # ---- TASK SCREEN ---- #
+
+    # showing the task screen where the user can add tasks or edit them
+    def show_task_screen(self, modifying=False):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+        self.is_modifying = modifying  # tracking
+
+        # setting up the title and input area for editing tasks
+        title_text = "Modify your tasks 📝" if modifying else "Let's plan your tasks 📝"
+        self.canvas.create_text(400, 60, text=title_text, font=self.handwriting_font, fill="black")
+
+        # creating the task input area 
+        self.canvas.create_text(400, 100, text="Add a task:", font=self.handwriting_font, fill="black")
+
+        self.task_entry = tk.Entry(self.root, font=self.handwriting_font, bg="white", bd=0)
+        self.canvas.create_window(400, 130, window=self.task_entry, width=300)
+
+        # creating the add task button 
+        add_btn = tk.Button(self.root, text="Add Task", font=self.handwriting_font, command=self.add_task)
+        self.canvas.create_window(400, 180, window=add_btn)
+
+        done_btn = tk.Button(self.root, text="Done", font=self.handwriting_font, command=self.check_if_ready)
+        self.canvas.create_window(700, 550, window=done_btn)
+
+        self.task_entry.bind("<Return>", lambda e: self.add_task())
+
+        
+        if modifying:
+            self.display_tasks_with_edit_delete()
+        else:
+            self.task_display = self.canvas.create_text(400, 240, text="", font=self.handwriting_font,
+                                                        fill="black", width=600, anchor="n")
+            self.update_task_display(animated=False)
+
+    # display tasks with delete buttons 
+    def display_tasks_with_delete(self):
+        y_start = 290
+        spacing = 35
+
+        # old buttons clean up 
+        for widget in self.root.winfo_children():
+            if isinstance(widget, tk.Button) and getattr(widget, "is_delete_btn", False):
+                widget.destroy()
+
+        for idx, task in enumerate(self.tasks):
+            # displaying the task text
+            task_text_id = self.canvas.create_text(350, y_start + idx * spacing, text=f"☐ {idx + 1}. {task}",
+                                                   font=self.handwriting_font, fill="black", anchor="w", tags=f"task{idx}")
+
+            # creating a delete button for each task
+            del_btn = tk.Button(self.root, text="Delete", font=("Arial", 10),
+                                command=lambda i=idx: self.delete_task(i))
+            del_btn.is_delete_btn = True  # mark button for easy cleanup
+            self.canvas.create_window(680, y_start + idx * spacing, window=del_btn)
+
+    # deleting a task from the list when the user clicks on the delete icon
+    def delete_task(self, index):
+        if 0 <= index < len(self.tasks):
+            self.tasks.pop(index)
+            self.display_tasks_with_edit_delete()
+
+    # checking if the user has added any tasks before proceeding
+    def check_if_ready(self):
+        if not self.tasks:
+            if self.no_tasks_warning_id is None: # only create warning if the user didn't input anything
+                self.no_tasks_warning_id = self.canvas.create_text(
+                    400, 280,
+                    text="Let's add at least one task first! 😊", 
+                    font=self.handwriting_font,
+                    fill="black"
+                )
+        else:
+            # remove warning if tasks are present
+            if self.no_tasks_warning_id:
+                self.canvas.delete(self.no_tasks_warning_id)
+                self.no_tasks_warning_id = None
+            self.ask_if_satisfied(from_done=True)
+
+    # adding a task to the list by typing it in and pressing a button
+    def add_task(self):
+        task = self.task_entry.get().strip()
+        if len(self.tasks) >= self.MAX_TASKS: # checking if maximum tasks are reached
+            self.show_max_tasks_prompt()
+            return
+        if task: # checking if the task is not empty
+            self.tasks.append(task)
+            self.task_entry.delete(0, "end")
+            if self.is_modifying:
+                self.display_tasks_with_edit_delete()
+            else:
+                self.update_task_display(animated=False)
+            
+            # removing the no tasks warning if task isn't empty
+            if self.no_tasks_warning_id:
+                self.canvas.delete(self.no_tasks_warning_id)
+                self.no_tasks_warning_id = None
+            
+            self.update_task_display(animated=True)
+
+            if len(self.tasks) == self.MAX_TASKS:
+                # Wait 2 seconds AFTER animation before asking
+                self.root.after(2000, self.ask_if_satisfied)
+
+    # editing an existing task after the user clicks on the edit icon
+    def edit_task(self, index):
+        if 0 <= index < len(self.tasks):
+            self.clear_task_widgets()
+            self.clear_edit_widgets()
+
+            y = 210 + index * 35
+
+            # creating entry for editing an existing task
+            edit_entry = tk.Entry(self.root, font=self.handwriting_font)
+            edit_entry.insert(0, self.tasks[index])
+            entry_win = self.canvas.create_window(400, y, window=edit_entry, width=400)
+            self.edit_widgets.append((edit_entry, entry_win))
+
+            # creating save button
+            save_btn = tk.Button(self.root, text="Save", font=("Arial", 10),
+                                command=lambda: self.save_edited_task(index, edit_entry))
+            save_win = self.canvas.create_window(640, y, window=save_btn)
+            self.edit_widgets.append((save_btn, save_win))
+
+            # creating cancel button
+            cancel_btn = tk.Button(self.root, text="Cancel", font=("Arial", 10),
+                                command=self.cancel_edit)
+            cancel_win = self.canvas.create_window(710, y, window=cancel_btn)
+            self.edit_widgets.append((cancel_btn, cancel_win))
+
+    # saving the edited task and updating the display
+    def save_edited_task(self, index, entry_widget):
+        new_text = entry_widget.get().strip()
+        if new_text:
+            self.tasks[index] = new_text
+        self.clear_edit_widgets()
+        self.display_tasks_with_edit_delete()
+
+    # cancelling the edit and going back to the task display
+    def cancel_edit(self):
+        self.clear_edit_widgets()
+        self.display_tasks_with_edit_delete()
+
+    # clearing edit widgets when not needed
+    def clear_edit_widgets(self):
+        for widget, window_id in self.edit_widgets:
+            widget.destroy()
+            self.canvas.delete(window_id)
+        self.edit_widgets = []
+
+    # displaying tasks with edit and delete buttons
+    def display_tasks_with_edit_delete(self):
+        self.clear_task_widgets()
+
+        y_start = 230
+        spacing = 35
+        self.task_widgets = []
+
+        for idx, task in enumerate(self.tasks):
+            y = y_start + idx * spacing
+
+            # displaying the task text
+            text_id = self.canvas.create_text(250, y, text=f"☐ {idx + 1}. {task}",
+                                            font=self.handwriting_font, fill="black", anchor="w", tags="task_text")
+
+            # creating modify button
+            modify_btn = tk.Button(self.root, text="✏️", font=("Arial", 10),
+                                command=lambda i=idx: self.edit_task(i))
+            modify_btn.is_task_widget = True
+            self.canvas.create_window(600, y, window=modify_btn)
+
+            # creating delete button
+            del_btn = tk.Button(self.root, text="🗑️", font=("Arial", 10),
+                                command=lambda i=idx: self.delete_task(i))
+            del_btn.is_task_widget = True
+            self.canvas.create_window(650, y, window=del_btn)
+
+            self.task_widgets.extend([modify_btn, del_btn])
+
+    def clear_task_widgets(self):
+        self.canvas.delete("task_text")
+        if hasattr(self, 'task_widgets'):
+            for widget in self.task_widgets:
+                widget.destroy()
+            self.task_widgets = []
+
+    # updating the task display with a typewriting effect 
+    def update_task_display(self, animated=False):
+        if not self.tasks:
+            self.canvas.itemconfig(self.task_display, text="")
+            return
+
+        if animated:
+            # show all except last immediately
+            all_but_last = [f"☐ {i+1}. {t}" for i, t in enumerate(self.tasks[:-1])]
+            base_text = "\n".join(all_but_last)
+            self.canvas.itemconfig(self.task_display, text=base_text + ("\n" if base_text else ""))
+            # animate only the last task
+            last_task_text = f"☐ {len(self.tasks)}. {self.tasks[-1]}"
+            self.animate_text_append(self.task_display, last_task_text)
+        else:
+            all_tasks = [f"☐ {i+1}. {t}" for i, t in enumerate(self.tasks)]
+            self.canvas.itemconfig(self.task_display, text="\n".join(all_tasks))
+    
+    # animate text in a typewriting effect
+    def animate_text(self, text_item, full_text, delay=50, callback=None):
+        def write_char(index=0):
+            if index <= len(full_text):
+                self.canvas.itemconfig(text_item, text=full_text[:index])
+                self.root.after(delay, write_char, index + 1)
+            else:
+                if callback:
+                    callback()
+        write_char()
+
+    # animate appending text to an existing text item in a typewriting effect
+    def animate_text_append(self, text_item, append_text, delay=50, callback=None):
+        base_text = self.canvas.itemcget(text_item, "text")
+        def write_char(index=0):
+            if index <= len(append_text):
+                self.canvas.itemconfig(text_item, text=base_text + append_text[:index])
+                self.root.after(delay, write_char, index + 1)
+            else:
+                if callback:
+                    callback()
+        write_char()
+
+    # adding a max task warning 
+    def show_max_tasks_prompt(self):
+        prompt = tk.Toplevel(self.root)
+        prompt.title("Maximum Tasks Reached")
+        label = tk.Label(prompt, text="You can add up to 5 tasks only.", font=self.handwriting_font)
+        label.pack(padx=20, pady=10)
+        ok_btn = tk.Button(prompt, text="OK", font=self.handwriting_font, command=prompt.destroy)
+        ok_btn.pack(pady=5)
+
+    # ---- ASK IF SATISFIED  ----
+
+     # giving the user a possibility to modify the tasks or proceed to the checklist
+    def ask_if_satisfied(self, from_done=False):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+
+        message = "Are you satisfied with your list? 🤔"
+        self.message_id = self.canvas.create_text(400, 150, text="", font=self.handwriting_font, fill="black", width=600)
+
+        # adding buttons to edit or proceed to the next step
+        def show_buttons():
+            proceed_btn = tk.Button(self.root, text="Proceed ✅", font=self.handwriting_font,
+                                    command=self.proceed_to_checklist)
+            modify_btn = tk.Button(self.root, text="Modify ✏️", font=self.handwriting_font,
+                                   command=lambda: self.show_task_screen(modifying=True))
+            self.canvas.create_window(300, 250, window=proceed_btn)
+            self.canvas.create_window(500, 250, window=modify_btn)
+
+        self.animate_text(self.message_id, message, callback=show_buttons)
+
+    # moving to the final checklist
+    def proceed_to_checklist(self):
+        self.show_checklist()
+
+    # ---- CHECKLIST SCREEN ---- #
+
+    # final checklist recap 
+    def show_checklist(self):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+
+        # show user intention at top
+        intention_title = self.canvas.create_text(400, 40, text="Today's Intention:", font=(self.handwriting_font[0], 18, "bold"), fill="black")
+        intention_text = self.canvas.create_text(400, 80, text=self.intention_text, font=self.handwriting_font, fill="black", width=700)
+
+        self.canvas.create_text(400, 130, text="Check off completed tasks ✅", font=self.handwriting_font, fill="black")
+
+        # making checkboxes for each task
+        self.check_vars = []
+        for idx, task in enumerate(self.tasks):
+            var = tk.BooleanVar()
+            chk = tk.Checkbutton(self.root, text=task, variable=var,
+                                 font=self.handwriting_font, bg="white", fg="black", anchor='w')
+            self.canvas.create_window(400, 180 + idx * 40, window=chk, width=600)
+            self.check_vars.append(var)
+
+        # adding a done button to stop running the program and jump to finish screen
+        done_btn = tk.Button(self.root, text="Done", font=self.handwriting_font, command=self.show_finish_screen)
+        self.canvas.create_window(700, 550, window=done_btn)
+
+    # ---- FINISH SCREEN ---- #
+
+    def show_finish_screen(self):
+        self.clear_screen()
+        self.load_background("background_flowers.jpg")
+
+        done_tasks = sum(var.get() for var in self.check_vars)
+        total = len(self.tasks)
+        finish_msg = f"Great job, {self.user_name}! You completed {done_tasks} out of {total} tasks today! 🎉"
+        finish_text = self.canvas.create_text(400, 300, text="", font=self.handwriting_font, fill="black", width=600)
+        self.typewriter_effect(finish_text, finish_msg)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = DailyPlannerApp(root)
+    root.mainloop()
+
+
+
