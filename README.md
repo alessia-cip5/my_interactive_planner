@@ -1,4 +1,4 @@
-# My Interactive Planner
+# My interactive Daily Planner
 
 Welcome to my interactive Daily Planner! This tool helps you stay organized and focused on your daily goals.
 
